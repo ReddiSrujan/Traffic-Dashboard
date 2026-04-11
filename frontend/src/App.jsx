@@ -23,7 +23,7 @@ import {
 // API Service
 // ═══════════════════════════════════════════
 
-const API_BASE_URL = "http://localhost:8000";
+const API_BASE_URL = "https://traffic-dashboard-pqlh.onrender.com";
 
 async function analyzeTraffic(formData) {
   const response = await fetch(`${API_BASE_URL}/analyze`, {
