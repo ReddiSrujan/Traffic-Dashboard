@@ -1,28 +1,39 @@
 import React, { useState, useRef } from 'react';
 import axios from 'axios';
+import { Analytics } from '@vercel/analytics/react';
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
   BarChart, Bar, Cell, Legend, ReferenceLine, ComposedChart, Line,
   RadarChart, Radar, PolarGrid, PolarAngleAxis, PolarRadiusAxis,
 } from 'recharts';
 
-/* ─── Theme ─────────────────────────────────────────────────────────────────── */
-const T = {
-  bg: '#07070a',
-  sidebar: '#0d0d12',
-  card: 'rgba(18,18,24,0.8)',
-  border: 'rgba(255,255,255,0.07)',
-  text: '#f0f0f2',
-  textSoft: '#9898a6',
-  textMuted: '#4a4a58',
-  green: '#10b981',
-  red: '#f43f5e',
-  cyan: '#22d3ee',
-  amber: '#fbbf24',
-  violet: '#a78bfa',
-  mono: "'JetBrains Mono', monospace",
-  chart: ['#a78bfa', '#f43f5e', '#fbbf24', '#64748b'],
+/* ─── Theme definitions ─────────────────────────────────────────────────────── */
+const darkTheme = {
+  bg: '#07070a', sidebar: '#0d0d12', card: 'rgba(18,18,24,0.8)',
+  border: 'rgba(255,255,255,0.07)', text: '#f0f0f2', textSoft: '#9898a6', textMuted: '#4a4a58',
+  green: '#10b981', red: '#f43f5e', cyan: '#22d3ee', amber: '#fbbf24', violet: '#a78bfa',
+  mono: "'JetBrains Mono', monospace", chart: ['#a78bfa', '#f43f5e', '#fbbf24', '#64748b'],
+  dotPattern: 'rgba(255,255,255,0.045)', mainDot: 'rgba(255,255,255,0.032)',
+  mainGlow: 'rgba(167,139,250,0.08)', kpiRibbon: 'rgba(0,0,0,0.5)', tabBar: 'rgba(0,0,0,0.3)',
+  tooltip: 'rgba(7,7,10,0.97)', tooltipShadow: '0 16px 48px rgba(0,0,0,0.7)',
+  inputBg: 'rgba(0,0,0,0.4)', selectBg: 'rgba(0,0,0,0.4)', phaseTableBg: 'rgba(0,0,0,0.2)',
+  progressTrack: 'rgba(0,0,0,0.4)', cardShadow: '0 2px 12px rgba(0,0,0,0.25)',
+  sidebarShadow: '4px 0 24px rgba(0,0,0,0.5)',
 };
+const lightTheme = {
+  bg: '#f0f2f5', sidebar: '#ffffff', card: 'rgba(255,255,255,0.92)',
+  border: 'rgba(0,0,0,0.09)', text: '#0d0d12', textSoft: '#44445a', textMuted: '#9090a8',
+  green: '#059669', red: '#e11d48', cyan: '#0891b2', amber: '#d97706', violet: '#7c3aed',
+  mono: "'JetBrains Mono', monospace", chart: ['#7c3aed', '#e11d48', '#d97706', '#64748b'],
+  dotPattern: 'rgba(0,0,0,0.07)', mainDot: 'rgba(0,0,0,0.055)',
+  mainGlow: 'rgba(124,58,237,0.05)', kpiRibbon: 'rgba(255,255,255,0.85)', tabBar: 'rgba(255,255,255,0.6)',
+  tooltip: 'rgba(255,255,255,0.98)', tooltipShadow: '0 8px 32px rgba(0,0,0,0.12)',
+  inputBg: 'rgba(0,0,0,0.05)', selectBg: 'rgba(0,0,0,0.05)', phaseTableBg: 'rgba(0,0,0,0.04)',
+  progressTrack: 'rgba(0,0,0,0.08)', cardShadow: '0 2px 12px rgba(0,0,0,0.08)',
+  sidebarShadow: '4px 0 24px rgba(0,0,0,0.15)',
+};
+// Mutable — Object.assign'd on toggle so all component renders pick up new values
+const T = { ...darkTheme };
 
 const fmtCr = (n) => n == null ? '—' : `₹${(n / 1e7).toFixed(2)} Cr`;
 const fmt2 = (n) => typeof n === 'number' ? n.toFixed(2) : '—';
@@ -49,7 +60,7 @@ function Card({ children, style, glow }) {
       border: `1px solid ${gc ? gc + '40' : T.border}`,
       borderRadius: '16px',
       backdropFilter: 'blur(12px)',
-      boxShadow: gc ? `0 0 36px -8px ${gc}25, 0 4px 16px rgba(0,0,0,0.3)` : '0 2px 12px rgba(0,0,0,0.25)',
+      boxShadow: gc ? `0 0 36px -8px ${gc}25, 0 4px 16px ${T.progressTrack}` : T.cardShadow,
       overflow: 'hidden',
       ...style,
     }}>{children}</div>
@@ -98,7 +109,7 @@ function MetricCard({ label, value, unit, color, sub, icon }) {
 
 function ProgressBar({ pct, color = T.violet, h = 8 }) {
   return (
-    <div style={{ height: h, background: 'rgba(0,0,0,0.4)', borderRadius: h, overflow: 'hidden', border: `1px solid ${T.border}` }}>
+    <div style={{ height: h, background: T.progressTrack, borderRadius: h, overflow: 'hidden', border: `1px solid ${T.border}` }}>
       <div style={{
         height: '100%', width: `${Math.min(100, Math.max(0, pct))}%`,
         background: `linear-gradient(90deg, ${color}80, ${color})`,
@@ -123,9 +134,9 @@ function CustomTooltip({ active, payload, label, valueFormatter }) {
   if (!active || !payload?.length) return null;
   return (
     <div style={{
-      background: 'rgba(7,7,10,0.97)', border: `1px solid ${T.border}`,
+      background: T.tooltip, border: `1px solid ${T.border}`,
       borderRadius: '12px', padding: '12px 16px',
-      boxShadow: '0 16px 48px rgba(0,0,0,0.7)', minWidth: '160px',
+      boxShadow: T.tooltipShadow, minWidth: '160px',
     }}>
       <div style={{ fontSize: '9px', fontWeight: 700, letterSpacing: '1px', color: T.textMuted, marginBottom: '8px' }}>YEAR {label}</div>
       <div style={{ height: '1px', background: T.border, marginBottom: '8px' }} />
@@ -147,7 +158,7 @@ function CustomTooltip({ active, payload, label, valueFormatter }) {
 }
 
 /* ─── Chart axis shorthands ─────────────────────────────────────────────────── */
-const axX = { tick: { fill: T.textMuted, fontSize: 10, fontFamily: T.mono }, axisLine: false, tickLine: false, dy: 8 };
+const axX = () => ({ tick: { fill: T.textMuted, fontSize: 10, fontFamily: T.mono }, axisLine: false, tickLine: false, dy: 8 });
 const axY = (fmt) => ({ tick: { fill: T.textMuted, fontSize: 10, fontFamily: T.mono }, axisLine: false, tickLine: false, width: 72, tickFormatter: fmt });
 
 /* ─── Label helpers ─────────────────────────────────────────────────────────── */
@@ -159,7 +170,7 @@ function InputField({ value, onChange, step }) {
     <input type="number" step={step} value={value}
       onChange={e => onChange(Number(e.target.value))}
       style={{
-        width: '100%', background: 'rgba(0,0,0,0.4)', border: `1px solid ${T.border}`,
+        width: '100%', background: T.inputBg, border: `1px solid ${T.border}`,
         borderRadius: '8px', padding: '10px 12px', color: T.text,
         fontFamily: T.mono, fontSize: '15px', outline: 'none', transition: 'border-color 0.15s',
       }}
@@ -215,6 +226,12 @@ export default function App() {
   const [sigMaint, setSigMaint] = useState(200000);
   const [buildCost, setBuildCost] = useState(50.0);
   const [gradeMaint, setGradeMaint] = useState(250000);
+  const [isDark, setIsDark] = useState(true);
+  const toggleTheme = () => {
+    const next = isDark ? lightTheme : darkTheme;
+    Object.assign(T, next);
+    setIsDark(v => !v);
+  };
 
   const [result, setResult] = useState(null);
   const [loading, setLoading] = useState(false);
@@ -282,27 +299,86 @@ export default function App() {
 
         {/* ══ SIDEBAR ══════════════════════════════════════════════════════════ */}
         <aside style={{
-          flexShrink: 0, width: '340px', height: '100%',
+          flexShrink: 0, width: '425px', height: '100%',
           display: 'flex', flexDirection: 'column',
           backgroundColor: T.sidebar,
-          backgroundImage: 'radial-gradient(rgba(255,255,255,0.045) 1px, transparent 1px)',
+          backgroundImage: `radial-gradient(${T.dotPattern} 1px, transparent 1px)`,
           backgroundSize: '22px 22px',
           borderRight: `1px solid ${T.border}`,
-          boxShadow: '4px 0 24px rgba(0,0,0,0.5)',
+          boxShadow: T.sidebarShadow,
         }}>
           {/* Logo header */}
           <div style={{ padding: '22px 20px 16px', borderBottom: `1px solid ${T.border}`, flexShrink: 0 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
-              <div style={{
-                width: '52px', height: '52px', borderRadius: '12px',
-                background: 'rgba(167,139,250,0.12)', border: '1px solid rgba(167,139,250,0.3)',
-                display: 'flex', alignItems: 'center', justifyContent: 'center', fontSize: '40px', flexShrink: 0,
-              }}>🚦</div>
-              <div>
-                <div style={{ fontSize: '24px', fontWeight: 800, letterSpacing: '-0.3px' }}>
+              <img
+                src="/logo.png"
+                alt="Traffic Economics Logo"
+                style={{
+                  width: '52px', height: '52px', borderRadius: '12px',
+                  objectFit: 'cover', flexShrink: 0,
+                  border: `1.5px solid ${T.violet}50`,
+                  boxShadow: `0 0 14px ${T.violet}30`,
+                }}
+              />
+              <div style={{ flex: 1 }}>
+                <div style={{ fontSize: '24px', fontWeight: 800, letterSpacing: '-0.3px', color: T.text }}>
                   Traffic <span style={{ color: T.violet }}>Economics</span>
                 </div>
-                <div style={{ fontSize: '10px', color: T.textSoft, fontWeight: 500 }}>30-Year Road Lifecycle Decision</div>
+                <div style={{ fontSize: '2px', color: T.textWhite, fontWeight: 500 }}>ROAD LIFECYCLE DECISION</div>
+              </div>
+              {/* Theme toggle — pill switch */}
+              <div onClick={toggleTheme} title={isDark ? 'Switch to Light' : 'Switch to Dark'}
+                style={{ display: 'flex', alignItems: 'center', gap: '8px', cursor: 'pointer', flexShrink: 0, userSelect: 'none' }}>
+                {/* Light label */}
+                <span style={{
+                  fontSize: '11px', fontWeight: 700, letterSpacing: '0.3px',
+                  color: !isDark ? T.text : T.textMuted,
+                  transition: 'color 0.3s', whiteSpace: 'nowrap',
+                }}>Light</span>
+
+                {/* Pill track */}
+                <div style={{
+                  width: '56px', height: '30px', borderRadius: '15px', position: 'relative',
+                  background: isDark ? '#12121e' : '#7b9ef5',
+                  border: isDark ? '1.5px solid rgba(255,255,255,0.12)' : '1.5px solid rgba(100,140,255,0.4)',
+                  boxShadow: isDark
+                    ? 'inset 0 2px 8px rgba(0,0,0,0.6), 0 0 12px rgba(100,80,200,0.3)'
+                    : 'inset 0 2px 6px rgba(80,100,200,0.2), 0 0 12px rgba(120,160,255,0.4)',
+                  transition: 'all 0.35s cubic-bezier(0.4,0,0.2,1)',
+                  flexShrink: 0,
+                }}>
+                  {/* Stars (visible in dark mode) */}
+                  {isDark && (<>
+                    <span style={{ position: 'absolute', top: '4px', left: '6px', fontSize: '7px', opacity: 0.8, transition: 'opacity 0.3s' }}>✦</span>
+                    <span style={{ position: 'absolute', top: '12px', left: '10px', fontSize: '5px', opacity: 0.6, transition: 'opacity 0.3s' }}>✦</span>
+                    <span style={{ position: 'absolute', top: '6px', left: '14px', fontSize: '4px', opacity: 0.5, transition: 'opacity 0.3s' }}>✦</span>
+                  </>)}
+                  {/* Small dot accent (light mode) */}
+                  {!isDark && (
+                    <div style={{ position: 'absolute', top: '6px', right: '7px', width: '5px', height: '5px', borderRadius: '50%', background: 'rgba(255,255,255,0.7)', transition: 'opacity 0.3s' }} />
+                  )}
+                  {/* Sliding knob */}
+                  <div style={{
+                    position: 'absolute', top: '3px',
+                    left: isDark ? 'calc(100% - 27px)' : '3px',
+                    width: '22px', height: '22px', borderRadius: '50%',
+                    background: isDark ? '#f0f0ff' : '#ffffff',
+                    boxShadow: isDark
+                      ? '0 2px 8px rgba(0,0,0,0.5)'
+                      : '0 2px 8px rgba(80,100,200,0.35)',
+                    display: 'flex', alignItems: 'center', justifyContent: 'center',
+                    fontSize: '13px', transition: 'left 0.35s cubic-bezier(0.4,0,0.2,1)',
+                  }}>
+                    {isDark ? '🌙' : '☀️'}
+                  </div>
+                </div>
+
+                {/* Dark label */}
+                <span style={{
+                  fontSize: '11px', fontWeight: 700, letterSpacing: '0.3px',
+                  color: isDark ? T.text : T.textMuted,
+                  transition: 'color 0.3s', whiteSpace: 'nowrap',
+                }}>Dark</span>
               </div>
             </div>
           </div>
@@ -312,11 +388,11 @@ export default function App() {
 
             <GroupHead>🚧 Traffic Model</GroupHead>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-              <FieldGroup label="Total Traffic Volume (PCU/h)" value={totalVol} onChange={setTotalVol} />
+              <FieldGroup label="Volume (PCU/h)" value={totalVol} onChange={setTotalVol} />
               <div>
                 <InputLabel>Total Number of Phases</InputLabel>
                 <select value={numPhases} onChange={e => changePhases(Number(e.target.value))} style={{
-                  width: '100%', background: 'rgba(0,0,0,0.4)', border: `1px solid ${T.border}`,
+                  width: '100%', background: T.selectBg, border: `1px solid ${T.border}`,
                   borderRadius: '8px', padding: '9px 11px', color: T.text, fontFamily: T.mono,
                   fontSize: '15px', outline: 'none', appearance: 'none', cursor: 'pointer',
                 }}>
@@ -328,7 +404,7 @@ export default function App() {
             </div>
 
             {/* Phase table */}
-            <div style={{ marginTop: '10px', background: 'rgba(0,0,0,0.2)', borderRadius: '10px', border: `1px solid ${T.border}`, overflow: 'hidden' }}>
+            <div style={{ marginTop: '10px', background: T.phaseTableBg, borderRadius: '10px', border: `1px solid ${T.border}`, overflow: 'hidden' }}>
               <div style={{ display: 'grid', gridTemplateColumns: '28px 1fr 52px', gap: '0', padding: '6px 8px 4px', borderBottom: `1px solid ${T.border}` }}>
                 <span />
                 <span style={{ fontSize: '11px', color: T.textMuted, fontWeight: 700, letterSpacing: '1px' }}>ANNUAL AVERAGE DAILY CRITICAL VOLUME (PCU/H/LANE)</span>
@@ -400,7 +476,7 @@ export default function App() {
           flex: 1, minWidth: 0, height: '100%',
           overflowY: 'auto', overflowX: 'hidden',
           backgroundColor: T.bg,
-          backgroundImage: `radial-gradient(ellipse 60% 40% at 65% 5%, rgba(167,139,250,0.08) 0%, transparent 55%), radial-gradient(rgba(255,255,255,0.032) 1px, transparent 1px)`,
+          backgroundImage: `radial-gradient(ellipse 60% 40% at 65% 5%, ${T.mainGlow} 0%, transparent 55%), radial-gradient(${T.mainDot} 1px, transparent 1px)`,
           backgroundSize: `100% 100%, 22px 22px`,
           display: 'flex', flexDirection: 'column',
         }}>
@@ -445,7 +521,7 @@ export default function App() {
                 {/* KPI ribbon — compact, wraps on small screens */}
                 <div style={{
                   display: 'flex', alignItems: 'stretch', flexWrap: 'nowrap', overflowX: 'auto',
-                  background: 'rgba(0, 0, 0, 0.5)', borderBottom: `2px solid ${T.border}`,
+                  background: T.kpiRibbon, borderBottom: `2px solid ${T.border}`,
                   backdropFilter: 'blur(20px)', flexShrink: 0,
                 }}>
                   <KpiCell label="Decision" value={dec.choice} color={hColor} />
@@ -463,7 +539,7 @@ export default function App() {
                 {/* Tab bar — scrollable, no overflow */}
                 <div style={{
                   display: 'flex', alignItems: 'flex-end', padding: '0 20px',
-                  background: 'rgba(0,0,0,0.3)', borderBottom: `1px solid ${T.border}`,
+                  background: T.tabBar, borderBottom: `1px solid ${T.border}`,
                   overflowX: 'auto', flexShrink: 0,
                 }}>
                   {TABS.map(t => {
@@ -521,12 +597,12 @@ export default function App() {
                               <div className="pulse" style={{ width: '7px', height: '7px', borderRadius: '50%', background: hColor, boxShadow: `0 0 8px ${hColor}` }} />
                               <span style={{ fontSize: '10px', fontWeight: 800, color: T.textMuted, letterSpacing: '2px' }}>ECONOMIC ANALYSIS</span>
                             </div>
-                            <h2 style={{ fontSize: '56px', fontWeight: 900, color: '#fff', letterSpacing: '-2px', lineHeight: 1, marginBottom: '16px' }}>{dec.choice}</h2>
+                            <h2 style={{ fontSize: '56px', fontWeight: 900, color: T.text, letterSpacing: '-2px', lineHeight: 1, marginBottom: '16px' }}>{dec.choice}</h2>
                             <Tag color={hColor}>{dec.status}</Tag>
                             <p style={{ marginTop: '20px', fontSize: '14px', color: T.textSoft, lineHeight: 1.9, maxWidth: '760px' }}>
-                              Based on 30-year lifecycle analysis at <strong style={{ color: '#fff' }}>{discount}% Discount Rate</strong>:&nbsp;
+                              Based on 30-year lifecycle analysis at <strong style={{ color: T.text }}>{discount}% Discount Rate</strong>:&nbsp;
                               {eco.delta_npv > 0
-                                ? <>Grade Separation delivers an NPV advantage of <strong style={{ color: T.green }}>{fmtCr(eco.delta_npv)}</strong>. IRR = <strong style={{ color: T.green }}>{fmt2(eco.irr)}%</strong>, clearing the hurdle rate. Payback in <strong style={{ color: '#fff' }}>{eco.payback ?? 'N/A'}</strong> years.</>
+                                ? <>Grade Separation delivers an NPV advantage of <strong style={{ color: T.green }}>{fmtCr(eco.delta_npv)}</strong>. IRR = <strong style={{ color: T.green }}>{fmt2(eco.irr)}%</strong>, clearing the hurdle rate. Payback in <strong style={{ color: T.text }}>{eco.payback ?? 'N/A'}</strong> years.</>
                                 : <>Signal preserves <strong style={{ color: T.amber }}>{fmtCr(Math.abs(eco.delta_npv))}</strong> of NPV: construction cost outweighs lifetime traffic gains.</>
                               }
                             </p>
@@ -548,7 +624,7 @@ export default function App() {
                             <ResponsiveContainer width="100%" height={310}>
                               <BarChart data={signalData} margin={{ top: 8, right: 8, left: -12, bottom: 30 }} barCategoryGap="30%">
                                 <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.03)" vertical={false} />
-                                <XAxis dataKey="year" {...axX} interval={0} angle={-45} textAnchor="end" height={50} />
+                                <XAxis dataKey="year" {...axX()} interval={0} angle={-45} textAnchor="end" height={50} />
                                 <YAxis {...axY(v => `${v.toFixed(1)}Cr`)} />
                                 <Tooltip content={<CustomTooltip valueFormatter={v => `₹${v.toFixed(2)} Cr`} />} cursor={{ fill: 'rgba(255,255,255,0.03)' }} />
                                 <Bar dataKey="val" name="Signal Cashflow" fill={T.red} fillOpacity={0.75} stroke={T.red} strokeWidth={1} radius={[4, 4, 0, 0]} />
@@ -560,7 +636,7 @@ export default function App() {
                             <ResponsiveContainer width="100%" height={310}>
                               <BarChart data={gradeData} margin={{ top: 8, right: 8, left: -12, bottom: 30 }} barCategoryGap="30%">
                                 <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.03)" vertical={false} />
-                                <XAxis dataKey="year" {...axX} interval={0} angle={-45} textAnchor="end" height={50} />
+                                <XAxis dataKey="year" {...axX()} interval={0} angle={-45} textAnchor="end" height={50} />
                                 <YAxis {...axY(v => `${v.toFixed(1)}Cr`)} />
                                 <Tooltip content={<CustomTooltip valueFormatter={v => `₹${v.toFixed(2)} Cr`} />} cursor={{ fill: 'rgba(255,255,255,0.03)' }} />
                                 <ReferenceLine y={0} stroke="rgba(255,255,255,0.15)" />
@@ -581,7 +657,7 @@ export default function App() {
                           <ResponsiveContainer width="100%" height={370}>
                             <BarChart data={incData} margin={{ top: 8, right: 8, left: -8, bottom: 30 }} barCategoryGap="30%">
                               <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.03)" vertical={false} />
-                              <XAxis dataKey="year" {...axX} interval={0} angle={-45} textAnchor="end" height={50} />
+                              <XAxis dataKey="year" {...axX()} interval={0} angle={-45} textAnchor="end" height={50} />
                               <YAxis {...axY(v => `${v.toFixed(0)}Cr`)} />
                               <Tooltip content={<CustomTooltip valueFormatter={v => `${v.toFixed(2)} Cr`} />} cursor={{ fill: 'rgba(255,255,255,0.03)' }} />
                               <ReferenceLine y={0} stroke="rgba(255,255,255,0.25)" strokeWidth={1.5}
@@ -605,7 +681,7 @@ export default function App() {
                           <ResponsiveContainer width="100%" height={400}>
                             <BarChart data={chrt.comps_sampled} margin={{ top: 8, right: 8, left: -8, bottom: 30 }} barCategoryGap="28%">
                               <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.03)" vertical={false} />
-                              <XAxis dataKey="year" {...axX} interval={0} angle={-45} textAnchor="end" height={50} />
+                              <XAxis dataKey="year" {...axX()} interval={0} angle={-45} textAnchor="end" height={50} />
                               <YAxis {...axY(v => `${v.toFixed(0)}Cr`)} />
                               <Tooltip content={<CustomTooltip />} cursor={{ fill: 'rgba(255,255,255,0.02)' }} />
                               <Legend wrapperStyle={{ fontSize: '11px', paddingTop: '16px', color: T.textSoft }} iconType="circle" iconSize={7} />
@@ -650,7 +726,7 @@ export default function App() {
                               <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
                                 <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
                                   <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: s.color, boxShadow: `0 0 8px ${s.color}80` }} />
-                                  <span style={{ fontSize: '10px', fontWeight: 800, color: s.active ? '#fff' : T.textSoft, letterSpacing: '1.5px' }}>{s.name}</span>
+                                  <span style={{ fontSize: '10px', fontWeight: 800, color: s.active ? T.text : T.textSoft, letterSpacing: '1.5px' }}>{s.name}</span>
                                 </div>
                                 <span style={{ fontSize: '18px', color: s.color, fontWeight: 700 }}>{s.icon}</span>
                               </div>
@@ -660,7 +736,7 @@ export default function App() {
                                 <div style={{ fontFamily: T.mono, fontSize: '26px', fontWeight: 900, color: s.val > 0 ? T.green : T.red, letterSpacing: '-0.5px', lineHeight: 1 }}>
                                   {fmtCr(s.val)}
                                 </div>
-                                <div style={{ fontSize: '10px', color: T.textMuted, marginTop: '4px' }}>Δ NPV (Grade Sep − Signal)</div>
+                                <div style={{ fontSize: '10px', color: T.textMuted, marginTop: '4px' }}>NPV (Grade Sep − Signal)</div>
                               </div>
 
                               {/* Desc */}
@@ -682,7 +758,7 @@ export default function App() {
                         </div>
 
                         {/* ── Spectrum range bar ── */}
-                        <Card style={{ padding: '24px 28px' }}>
+                        <Card style={{ padding: '24px 50px' }}>
                           <div style={{ fontSize: '11px', fontWeight: 700, color: T.textMuted, letterSpacing: '1px', marginBottom: '20px' }}>NPV OUTCOME SPECTRUM</div>
                           {(() => {
                             const vals = [chrt.scenarios.pessimistic, chrt.scenarios.base, chrt.scenarios.optimistic];
@@ -815,8 +891,8 @@ export default function App() {
                         <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '16px' }}>
                           <MetricCard icon="📊" label="Project IRR" value={fmt2(eco.irr)} unit="%" color={eco.irr > discount ? T.green : T.red}
                             sub={eco.irr > discount ? `+${(eco.irr - discount).toFixed(2)}pp above Discount Rate` : `${(discount - eco.irr).toFixed(2)}pp below Discount Rate`} />
-                          <MetricCard icon="🏦" label="Discount Rate" value={discount} unit="%" color={T.cyan} />
-                          <MetricCard icon="📐" label="Δ NPV" value={fmtCr(eco.delta_npv)} color={eco.delta_npv > 0 ? T.green : T.red} />
+                          <MetricCard icon="💸" label="Discount Rate" value={discount} unit="%" color={T.cyan} />
+                          <MetricCard icon="💰" label="NPV" value={fmtCr(eco.delta_npv)} color={eco.delta_npv > 0 ? T.green : T.red} />
                         </div>
 
                         <Card style={{ padding: '24px 28px' }}>
@@ -877,7 +953,7 @@ export default function App() {
                           <ResponsiveContainer width="100%" height={380}>
                             <ComposedChart data={incData} margin={{ top: 28, right: 12, left: -8, bottom: 0 }}>
                               <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.03)" vertical={false} />
-                              <XAxis dataKey="year" {...axX} />
+                              <XAxis dataKey="year" {...axX()} />
                               <YAxis {...axY(v => `${v.toFixed(0)}Cr`)} />
                               <Tooltip content={<CustomTooltip />} />
                               <ReferenceLine y={0} stroke="rgba(255,255,255,0.2)" strokeWidth={1.5}
@@ -903,6 +979,7 @@ export default function App() {
           })()}
         </main>
       </div>
+      <Analytics />
     </>
   );
 }
