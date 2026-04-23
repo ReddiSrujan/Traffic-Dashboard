@@ -241,6 +241,9 @@ export default function App() {
   const [error, setError] = useState(null);
   const [tab, setTab] = useState('signal');
   const mainRef = useRef(null);
+  const kpiRef = useRef(null);
+  const tabRef = useRef(null);
+  const scrollBar = (ref, dir) => ref.current?.scrollBy({ left: dir * 200, behavior: 'smooth' });
 
   const changePhases = (v) => {
     setNumPhases(v);
@@ -254,7 +257,7 @@ export default function App() {
   const run = async () => {
     setLoading(true); setError(null);
     try {
-      const { data } = await axios.post('https://traffic-dashboard-pqlh.onrender.com/analyze', {
+      const { data } = await axios.post('http://127.0.0.1:8000/analyze', {
         num_phases: numPhases,
         phases: phaseData.map(p => ({ critical_volume: p.criticalVolume, lanes: p.lanes })),
         total_volume: totalVol, occupancy, gdp, population,
@@ -277,7 +280,6 @@ export default function App() {
   const isGS = eco?.delta_npv > 0 || web?.is_saturated;
   const hColor = isGS ? T.green : T.amber;
 
-  
   if (MAINTENANCE) {
     return (
       <div style={{
@@ -292,6 +294,7 @@ export default function App() {
       </div>
     );
   }
+
   return (
     <>
       <style>{`
@@ -573,45 +576,87 @@ export default function App() {
             return (
               <div className="fu" style={{ display: 'flex', flexDirection: 'column', flex: 1, minHeight: 0 }}>
 
-                {/* KPI ribbon — compact, wraps on small screens */}
-                <div style={{
-                  display: 'flex', alignItems: 'stretch', flexWrap: 'nowrap', overflowX: 'auto',
-                  background: T.kpiRibbon, borderBottom: `2px solid ${T.border}`,
-                  backdropFilter: 'blur(20px)', flexShrink: 0,
-                }}>
-                  <KpiCell label="Decision" value={dec.choice} color={hColor} />
-                  <KpiCell label="NPV" value={fmtCr(eco.delta_npv)} color={eco.delta_npv > 0 ? T.green : T.red} />
-                  <KpiCell label="IRR" value={`${fmt2(eco.irr)}%`} color={eco.irr > discount ? T.green : T.red} />
-                  <KpiCell label="Payback" value={eco.payback ? `Yr ${eco.payback}` : 'N/A'} color={T.amber} />
-                  <KpiCell label="Saturation" value={fmt2(web.sum_flow_ratios)} color={web.is_saturated ? T.red : T.green} />
-                  <KpiCell label="Cycle" value={`${web.cycle_time.toFixed(0)}s`} color={T.cyan} />
-                  <KpiCell label="Avg Delay" value={`${web.avg_delay.toFixed(1)}s`} color={T.violet} />
-                  <div style={{ flex: 1, display: 'flex', alignItems: 'center', padding: '0 20px', justifyContent: 'flex-end' }}>
-                    <Tag color={hColor} small>{dec.status}</Tag>
+                {/* KPI ribbon — compact + arrow scroll */}
+                <div style={{ position: 'relative', flexShrink: 0 }}>
+                  {/* Left arrow */}
+                  <button onClick={() => scrollBar(kpiRef, -1)} style={{
+                    position: 'absolute', left: 0, top: 0, bottom: 0, zIndex: 2, width: '32px',
+                    background: `linear-gradient(to right, ${T.kpiRibbon}, transparent)`,
+                    border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center',
+                    justifyContent: 'center', color: T.textSoft, fontSize: '14px',
+                    transition: 'color 0.15s',
+                  }} onMouseEnter={e => e.currentTarget.style.color = T.text}
+                    onMouseLeave={e => e.currentTarget.style.color = T.textSoft}>‹</button>
+                  {/* Scrollable KPI cells */}
+                  <div ref={kpiRef} style={{
+                    display: 'flex', alignItems: 'stretch', flexWrap: 'nowrap', overflowX: 'auto',
+                    background: T.kpiRibbon, borderBottom: `2px solid ${T.border}`,
+                    backdropFilter: 'blur(20px)', scrollbarWidth: 'none', paddingLeft: '32px', paddingRight: '32px',
+                  }}>
+                    <KpiCell label="Decision" value={dec.choice} color={hColor} />
+                    <KpiCell label="NPV" value={fmtCr(eco.delta_npv)} color={eco.delta_npv > 0 ? T.green : T.red} />
+                    <KpiCell label="IRR" value={`${fmt2(eco.irr)}%`} color={eco.irr > discount ? T.green : T.red} />
+                    <KpiCell label="Payback" value={eco.payback ? `Yr ${eco.payback}` : 'N/A'} color={T.amber} />
+                    <KpiCell label="Saturation" value={fmt2(web.sum_flow_ratios)} color={web.is_saturated ? T.red : T.green} />
+                    <KpiCell label="Cycle" value={`${web.cycle_time.toFixed(0)}s`} color={T.cyan} />
+                    <KpiCell label="Avg Delay" value={`${web.avg_delay.toFixed(1)}s`} color={T.violet} />
+                    <div style={{ flex: 1, display: 'flex', alignItems: 'center', padding: '0 20px', justifyContent: 'flex-end' }}>
+                      <Tag color={hColor} small>{dec.status}</Tag>
+                    </div>
                   </div>
+                  {/* Right arrow */}
+                  <button onClick={() => scrollBar(kpiRef, 1)} style={{
+                    position: 'absolute', right: 0, top: 0, bottom: 0, zIndex: 2, width: '32px',
+                    background: `linear-gradient(to left, ${T.kpiRibbon}, transparent)`,
+                    border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center',
+                    justifyContent: 'center', color: T.textSoft, fontSize: '14px',
+                    transition: 'color 0.15s',
+                  }} onMouseEnter={e => e.currentTarget.style.color = T.text}
+                    onMouseLeave={e => e.currentTarget.style.color = T.textSoft}>›</button>
                 </div>
 
-                {/* Tab bar — scrollable, no overflow */}
-                <div style={{
-                  display: 'flex', alignItems: 'flex-end', padding: '0 20px',
-                  background: T.tabBar, borderBottom: `1px solid ${T.border}`,
-                  overflowX: 'auto', flexShrink: 0,
-                }}>
-                  {TABS.map(t => {
-                    const active = tab === t.id;
-                    return (
-                      <button key={t.id} onClick={() => setTab(t.id)} style={{
-                        padding: '10px 20px', border: 'none', background: 'none',
-                        color: active ? T.text : T.textMuted,
-                        fontWeight: active ? 700 : 500, fontSize: '15px',
-                        borderBottom: `2px solid ${active ? T.violet : 'transparent'}`,
-                        display: 'flex', alignItems: 'center', gap: '5px', whiteSpace: 'nowrap',
-                        transition: 'color 0.15s, border-color 0.15s', flexShrink: 0,
-                      }}>
-                        <span style={{ fontSize: '15px' }}>{t.icon}</span>{t.label}
-                      </button>
-                    );
-                  })}
+                {/* Tab bar — scrollable + arrow scroll */}
+                <div style={{ position: 'relative', flexShrink: 0 }}>
+                  {/* Left arrow */}
+                  <button onClick={() => scrollBar(tabRef, -1)} style={{
+                    position: 'absolute', left: 0, top: 0, bottom: 0, zIndex: 2, width: '28px',
+                    background: `linear-gradient(to right, ${T.tabBar} 60%, transparent)`,
+                    border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center',
+                    justifyContent: 'center', color: T.textSoft, fontSize: '16px', fontWeight: 700,
+                    transition: 'color 0.15s',
+                  }} onMouseEnter={e => e.currentTarget.style.color = T.violet}
+                    onMouseLeave={e => e.currentTarget.style.color = T.textSoft}>‹</button>
+                  {/* Scrollable tabs */}
+                  <div ref={tabRef} style={{
+                    display: 'flex', alignItems: 'flex-end', paddingLeft: '28px', paddingRight: '28px',
+                    background: T.tabBar, borderBottom: `1px solid ${T.border}`,
+                    overflowX: 'auto', scrollbarWidth: 'none',
+                  }}>
+                    {TABS.map(t => {
+                      const active = tab === t.id;
+                      return (
+                        <button key={t.id} onClick={() => setTab(t.id)} style={{
+                          padding: '10px 20px', border: 'none', background: 'none',
+                          color: active ? T.text : T.textMuted,
+                          fontWeight: active ? 700 : 500, fontSize: '15px',
+                          borderBottom: `2px solid ${active ? T.violet : 'transparent'}`,
+                          display: 'flex', alignItems: 'center', gap: '5px', whiteSpace: 'nowrap',
+                          transition: 'color 0.15s, border-color 0.15s', flexShrink: 0,
+                        }}>
+                          <span style={{ fontSize: '15px' }}>{t.icon}</span>{t.label}
+                        </button>
+                      );
+                    })}
+                  </div>
+                  {/* Right arrow */}
+                  <button onClick={() => scrollBar(tabRef, 1)} style={{
+                    position: 'absolute', right: 0, top: 0, bottom: 0, zIndex: 2, width: '28px',
+                    background: `linear-gradient(to left, ${T.tabBar} 60%, transparent)`,
+                    border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center',
+                    justifyContent: 'center', color: T.textSoft, fontSize: '16px', fontWeight: 700,
+                    transition: 'color 0.15s',
+                  }} onMouseEnter={e => e.currentTarget.style.color = T.violet}
+                    onMouseLeave={e => e.currentTarget.style.color = T.textSoft}>›</button>
                 </div>
 
                 {/* Tab panels */}
