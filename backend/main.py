@@ -630,16 +630,16 @@ def analyze(data: dict):
         if webster["is_saturated"]:
             decision = "🏗️ Grade Separation"
             reason = "Intersection is beyond capacity (Y ≥ 0.95). Signal cannot handle flow regardless of economics."
-        elif economic["delta_npv"] > 0:
+        elif combined_variability["overall_expected_npv"] > 0:
             decision = "🏗️ Grade Separation"
-            reason = "Positive Incremental NPV implies total societal benefits over 30 years exceed construction and maintenance costs."
+            reason = "Positive Expected Incremental NPV (weighted across 15 variability scenarios) implies total societal benefits over 30 years exceed construction and maintenance costs."
         
         status = "Conditionally Recommended"
         if webster["is_saturated"]:
             status = "Mandatory"
-        elif economic["delta_npv"] > 0:
+        elif combined_variability["overall_expected_npv"] > 0:
             status = "Robustly Recommended"
-        elif economic["delta_npv"] < 0:
+        elif combined_variability["overall_expected_npv"] < 0:
             status = "Strongly Disrecommended"
         # Payback statement addition per rules
         if economic["discounted_payback_years"] is not None and economic["discounted_payback_years"] > 20:
@@ -682,7 +682,7 @@ def analyze(data: dict):
             "webster": webster,
             "economic": {
                 "npv_s": economic["npv_s"],
-                "delta_npv": economic["delta_npv"],
+                "delta_npv": combined_variability["overall_expected_npv"],
                 "irr": economic["irr"],
                 "payback": economic["payback_years"],
                 "discounted_payback": economic["discounted_payback_years"],
