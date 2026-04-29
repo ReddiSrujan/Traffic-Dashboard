@@ -3,8 +3,8 @@ import axios from 'axios';
 import { Analytics } from '@vercel/analytics/react';
 import {
   AreaChart, Area, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer,
-  BarChart, Bar, Cell, Legend, ReferenceLine, ComposedChart, Line,
-  RadarChart, Radar, PolarGrid, PolarAngleAxis, PolarRadiusAxis,
+  BarChart, Bar, Cell, Legend, ReferenceLine, ComposedChart, Line, LineChart,
+
 } from 'recharts';
 
 /* ─── Maintenance ─────────────────────────────────────────────────────── */
@@ -182,9 +182,10 @@ function InputField({ value, onChange, step }) {
     />
   );
 }
-function FieldGroup({ label, value, onChange, step, full }) {
+function FieldGroup({ label, value, onChange, step, full, tooltip, tooltipPos }) {
   return (
-    <div style={{ display: 'flex', flexDirection: 'column', gap: '5px', ...(full ? { gridColumn: '1/-1' } : {}) }}>
+    <div className="input-wrapper" style={{ display: 'flex', flexDirection: 'column', gap: '5px', ...(full ? { gridColumn: '1/-1' } : {}) }}>
+      {tooltip && <div className={`tooltip-text ${tooltipPos === 'down' ? 'tooltip-down' : ''}`}>{tooltip}</div>}
       <InputLabel>{label}</InputLabel>
       <InputField value={value} onChange={onChange} step={step} />
     </div>
@@ -204,7 +205,7 @@ const TABS = [
   { id: 'signal', label: 'SIGNAL', icon: '1.' },
   { id: 'cashflow', label: 'CASH FLOWS', icon: '2.' },
   { id: 'npv', label: 'NPV', icon: '3.' },
-  // { id: 'scenario',    label: 'SCENARIOS',       icon: '4.' },  // hidden — uncomment to enable
+
   { id: 'risk', label: 'SENSITIVITY & IRR', icon: '4.' },
   { id: 'payback', label: 'PAYBACK', icon: '5.' },
   // { id: 'variability', label: 'VARIABILITY-GDP', icon: '7.' },  // hidden — uncomment to enable
@@ -265,9 +266,11 @@ export default function App() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState(null);
   const [tab, setTab] = useState('signal');
+  const [fuelTab, setFuelTab] = useState('green');
   const mainRef = useRef(null);
   const kpiRef = useRef(null);
   const tabRef = useRef(null);
+  const tableScrollRef = useRef(null);
   const scrollBar = (ref, dir) => ref.current?.scrollBy({ left: dir * 200, behavior: 'smooth' });
 
   const changePhases = (v) => {
@@ -340,6 +343,81 @@ export default function App() {
         @keyframes pulse2{0%,100%{opacity:1}50%{opacity:.35}}
         .pulse{animation:pulse2 2s ease-in-out infinite}
         button{font-family:inherit;cursor:pointer}
+
+        .input-wrapper {
+          position: relative;
+        }
+        .input-wrapper .tooltip-text {
+          visibility: hidden;
+          opacity: 0;
+          width: 220px;
+          background-color: ${T.tooltip};
+          color: ${T.text};
+          text-align: left;
+          border-radius: 8px;
+          padding: 8px 12px;
+          position: absolute;
+          z-index: 50;
+          bottom: calc(100% + 5px);
+          left: 50%;
+          transform: translateX(-50%) translateY(5px);
+          font-size: 11px;
+          line-height: 1.5;
+          font-weight: 500;
+          border: 1px solid ${T.border};
+          box-shadow: ${T.tooltipShadow};
+          transition: opacity 0.2s, transform 0.2s, visibility 0.2s;
+          pointer-events: none;
+        }
+        .input-wrapper .tooltip-text::after {
+          content: "";
+          position: absolute;
+          top: 100%;
+          left: 50%;
+          margin-left: -5px;
+          border-width: 5px;
+          border-style: solid;
+          border-color: ${T.border} transparent transparent transparent;
+        }
+        .input-wrapper:hover .tooltip-text {
+          visibility: visible;
+          opacity: 1;
+          transform: translateX(-50%) translateY(0);
+        }
+        
+        .input-wrapper .tooltip-text.tooltip-down {
+          bottom: auto;
+          top: calc(100% + 5px);
+          transform: translateX(-50%) translateY(-5px);
+        }
+        .input-wrapper:hover .tooltip-text.tooltip-down {
+          transform: translateX(-50%) translateY(0);
+        }
+        .input-wrapper .tooltip-text.tooltip-down::after {
+          top: auto;
+          bottom: 100%;
+          border-color: transparent transparent ${T.border} transparent;
+        }
+
+        .input-wrapper .tooltip-text.tooltip-right {
+          left: auto;
+          right: -10px;
+          transform: translateY(5px);
+        }
+        .input-wrapper:hover .tooltip-text.tooltip-right {
+          transform: translateY(0);
+        }
+        .input-wrapper .tooltip-text.tooltip-right::after {
+          left: auto;
+          right: 20px;
+        }
+
+        .input-wrapper .tooltip-text.tooltip-down.tooltip-right {
+          transform: translateY(-5px);
+        }
+        .input-wrapper:hover .tooltip-text.tooltip-down.tooltip-right {
+          transform: translateY(0);
+        }
 
         .app-layout {
           display: flex;
@@ -472,8 +550,9 @@ export default function App() {
 
             <GroupHead>🚧 Traffic Model</GroupHead>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-              <FieldGroup label="Volume (PCU/h)" value={totalVol} onChange={setTotalVol} />
-              <div>
+              <FieldGroup label="Volume (PCU/h)" value={totalVol} onChange={setTotalVol} tooltipPos="down" tooltip="Annual average hourly traffic volume in Passenger Car Units (PCU)." />
+              <div className="input-wrapper">
+                <div className="tooltip-text tooltip-down tooltip-right">Select the number of traffic signal phases (e.g., 4 phases for a standard 4-way intersection).</div>
                 <InputLabel>Total Number of Phases</InputLabel>
                 <select value={numPhases} onChange={e => changePhases(Number(e.target.value))} style={{
                   width: '100%', background: T.selectBg, border: `1px solid ${T.border}`,
@@ -483,16 +562,22 @@ export default function App() {
                   {[2, 3, 4, 5, 6, 7, 8].map(n => <option key={n} value={n}>{n} phases</option>)}
                 </select>
               </div>
-              <FieldGroup label="Occupancy" value={occupancy} onChange={setOccupancy} step="0.1" />
+              <FieldGroup label="Occupancy" value={occupancy} onChange={setOccupancy} step="0.1" tooltip="Average number of passengers per vehicle (e.g., 1.8 for standard cars)." />
 
             </div>
 
             {/* Phase table */}
-            <div style={{ marginTop: '10px', background: T.phaseTableBg, borderRadius: '10px', border: `1px solid ${T.border}`, overflow: 'hidden' }}>
+            <div style={{ marginTop: '10px', background: T.phaseTableBg, borderRadius: '10px', border: `1px solid ${T.border}` }}>
               <div style={{ display: 'grid', gridTemplateColumns: '28px 1fr 52px', gap: '0', padding: '6px 8px 4px', borderBottom: `1px solid ${T.border}` }}>
                 <span />
-                <span style={{ fontSize: '11px', color: T.textMuted, fontWeight: 700, letterSpacing: '1px' }}>ANNUAL AVERAGE DAILY CRITICAL VOLUME (PCU/H/LANE)</span>
-                <span style={{ fontSize: '11px', color: T.textMuted, fontWeight: 700, letterSpacing: '1px', textAlign: 'center' }}>NO. OF LANES</span>
+                <span className="input-wrapper" style={{ fontSize: '11px', color: T.textMuted, fontWeight: 700, letterSpacing: '1px' }}>
+                  ANNUAL AVERAGE DAILY CRITICAL VOLUME (PCU/H/LANE)
+                  <div className="tooltip-text tooltip-down">Critical volume per lane for this specific phase in Passenger Car Units per hour.</div>
+                </span>
+                <span className="input-wrapper" style={{ fontSize: '11px', color: T.textMuted, fontWeight: 700, letterSpacing: '1px', textAlign: 'center' }}>
+                  NO. OF LANES
+                  <div className="tooltip-text tooltip-down tooltip-right">Number of critical lanes dedicated to this phase.</div>
+                </span>
               </div>
               {phaseData.map((p, i) => (
                 <div key={i} style={{ display: 'grid', gridTemplateColumns: '28px 1fr 52px', gap: '0', padding: '4px 8px', alignItems: 'center', borderBottom: i < phaseData.length - 1 ? `1px solid ${T.border}` : 'none' }}>
@@ -509,23 +594,23 @@ export default function App() {
 
             <GroupHead>💰 Economic Parameters</GroupHead>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr', gap: '10px' }}>
-              <FieldGroup label="City GDP (₹ Cr)" value={gdp} onChange={setGdp} full />
-              <FieldGroup label="Population (2011 Census)" value={pop2011} onChange={setPop2011} full />
-              <FieldGroup label="Discount Rate %" value={discount} onChange={setDiscount} step="0.1" />
+              <FieldGroup label="City GDP (₹ Cr)" value={gdp} onChange={setGdp} full tooltip="Current Gross Domestic Product base value in Crores." />
+              <FieldGroup label="Population (2011 Census)" value={pop2011} onChange={setPop2011} full tooltip="Enter the city's 2011 census population. This sets the tier and population projection." />
+              <FieldGroup label="Discount Rate %" value={discount} onChange={setDiscount} step="0.1" tooltip="Annual discount rate percentage used for Net Present Value (NPV) calculation." />
 
-              <FieldGroup label="Inflation %" value={inflation} onChange={setInflation} step="0.1" />
-              <FieldGroup label="Fuel (₹/L)" value={fuelCost} onChange={setFuelCost} />
-              <FieldGroup label="Idle (L/h)" value={idleFuel} onChange={setIdleFuel} step="0.1" />
-              <FieldGroup label="VOC (₹/km)" value={voc} onChange={setVoc} step="0.1" />
-              <FieldGroup label="Carbon (₹/kg)" value={carbon} onChange={setCarbon} step="0.1" />
+              <FieldGroup label="Inflation %" value={inflation} onChange={setInflation} step="0.1" tooltip="General annual inflation rate percentage used to project future costs." />
+              <FieldGroup label="Fuel (₹/L)" value={fuelCost} onChange={setFuelCost} tooltip="Current base fuel price per litre in INR." />
+              <FieldGroup label="Idle (L/h)" value={idleFuel} onChange={setIdleFuel} step="0.1" tooltip="Fuel consumption rate in litres per hour while a vehicle is idling at the signal." />
+              <FieldGroup label="VOC (₹/km)" value={voc} onChange={setVoc} step="0.1" tooltip="Vehicle Operating Cost in INR per kilometer." />
+              <FieldGroup label="Carbon (₹/kg)" value={carbon} onChange={setCarbon} step="0.1" tooltip="Cost of carbon emissions per kilogram in INR." />
             </div>
 
             <GroupHead>🏗️ Infrastructure</GroupHead>
             <div style={{ display: 'grid', gridTemplateColumns: '1fr', gap: '10px', marginBottom: '20px' }}>
-              <FieldGroup label="Grade Sep. Build (₹ Cr)" value={buildCost} onChange={setBuildCost} />
-              <FieldGroup label="Grade Sep. Annual O&M (₹)" value={gradeMaint} onChange={setGradeMaint} />
-              <FieldGroup label="Signal Install (₹)" value={sigInstall} onChange={setSigInstall} />
-              <FieldGroup label="Signal Annual Maint. (₹)" value={sigMaint} onChange={setSigMaint} />
+              <FieldGroup label="Grade Sep. Build (₹ Cr)" value={buildCost} onChange={setBuildCost} tooltip="Total upfront construction cost for the grade separation." />
+              <FieldGroup label="Grade Sep. Annual O&M (₹)" value={gradeMaint} onChange={setGradeMaint} tooltip="Annual recurring maintenance cost for the grade separation." />
+              <FieldGroup label="Signal Install (₹)" value={sigInstall} onChange={setSigInstall} tooltip="Total upfront capital cost to install the traffic signal." />
+              <FieldGroup label="Signal Annual Maint. (₹)" value={sigMaint} onChange={setSigMaint} tooltip="Annual recurring maintenance cost for the traffic signal." />
             </div>
           </div>
 
@@ -822,103 +907,6 @@ export default function App() {
                       </div>
                     )}
 
-                    {/* ── SCENARIOS ──────────────────────────────────────────── */}
-                    {tab === 'scenario' && (
-                      <div style={{ display: 'flex', flexDirection: 'column', gap: '28px' }}>
-                        <SectionLabel num="5">30-Year NPV Horizon Scenarios</SectionLabel>
-
-                        {/* ── 3 equal scenario cards ── */}
-                        <div style={{ display: 'grid', gridTemplateColumns: '1fr 1fr 1fr', gap: '16px' }}>
-                          {[
-                            {
-                              name: 'PESSIMISTIC', val: chrt.scenarios.pessimistic, color: T.red,
-                              icon: '↘', desc: 'Worst-case macro conditions',
-                              deltas: ['Traffic −1.5pp', 'GDP −2pp', 'DR +2%', 'Cost +20%'],
-                            },
-                            {
-                              name: 'BASE CASE', val: chrt.scenarios.base, color: T.violet,
-                              icon: '→', desc: 'Current inputs, no perturbation', active: true,
-                              deltas: ['As entered in sidebar'],
-                            },
-                            {
-                              name: 'OPTIMISTIC', val: chrt.scenarios.optimistic, color: T.green,
-                              icon: '↗', desc: 'Best-case macro conditions',
-                              deltas: ['Traffic +1.5pp', 'GDP +2pp', 'DR −2%', 'Cost −20%'],
-                            },
-                          ].map((s, i) => (
-                            <Card key={i} glow={s.active ? 'violet' : undefined}
-                              style={{ padding: '24px', display: 'flex', flexDirection: 'column', gap: '16px' }}>
-                              {/* Header */}
-                              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between' }}>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
-                                  <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: s.color, boxShadow: `0 0 8px ${s.color}80` }} />
-                                  <span style={{ fontSize: '10px', fontWeight: 800, color: s.active ? T.text : T.textSoft, letterSpacing: '1.5px' }}>{s.name}</span>
-                                </div>
-                                <span style={{ fontSize: '18px', color: s.color, fontWeight: 700 }}>{s.icon}</span>
-                              </div>
-
-                              {/* NPV value */}
-                              <div>
-                                <div style={{ fontFamily: T.mono, fontSize: '26px', fontWeight: 900, color: s.val > 0 ? T.green : T.red, letterSpacing: '-0.5px', lineHeight: 1 }}>
-                                  {fmtCr(s.val)}
-                                </div>
-                                <div style={{ fontSize: '10px', color: T.textMuted, marginTop: '4px' }}>NPV (Grade Sep − Signal)</div>
-                              </div>
-
-                              {/* Desc */}
-                              <div style={{ fontSize: '11px', color: T.textSoft, lineHeight: 1.6 }}>{s.desc}</div>
-
-                              {/* Parameter deltas */}
-                              <div style={{ display: 'flex', flexWrap: 'wrap', gap: '5px', marginTop: 'auto' }}>
-                                {s.deltas.map((d, j) => (
-                                  <span key={j} style={{
-                                    fontSize: '9px', fontWeight: 700, fontFamily: T.mono,
-                                    padding: '2px 7px', borderRadius: '4px',
-                                    background: `${s.color}18`, border: `1px solid ${s.color}40`,
-                                    color: s.color, letterSpacing: '0.3px',
-                                  }}>{d}</span>
-                                ))}
-                              </div>
-                            </Card>
-                          ))}
-                        </div>
-
-                        {/* ── Spectrum range bar ── */}
-                        <Card style={{ padding: '24px 50px' }}>
-                          <div style={{ fontSize: '11px', fontWeight: 700, color: T.textMuted, letterSpacing: '1px', marginBottom: '20px' }}>NPV OUTCOME SPECTRUM</div>
-                          {(() => {
-                            const vals = [chrt.scenarios.pessimistic, chrt.scenarios.base, chrt.scenarios.optimistic];
-                            const min = Math.min(...vals);
-                            const max = Math.max(...vals);
-                            const span = max - min || 1;
-                            const pct = (v) => ((v - min) / span) * 100;
-                            return (
-                              <>
-                                <div style={{ position: 'relative', height: '10px', background: `linear-gradient(90deg, ${T.red}66, ${T.violet}66, ${T.green}66)`, borderRadius: '6px', marginBottom: '28px' }}>
-                                  {[
-                                    { val: chrt.scenarios.pessimistic, color: T.red, label: 'Pessimistic' },
-                                    { val: chrt.scenarios.base, color: T.violet, label: 'Base' },
-                                    { val: chrt.scenarios.optimistic, color: T.green, label: 'Optimistic' },
-                                  ].map((m, i) => (
-                                    <div key={i} style={{ position: 'absolute', top: '50%', left: `${pct(m.val)}%`, transform: 'translate(-50%, -50%)' }}>
-                                      <div style={{ width: '14px', height: '14px', borderRadius: '50%', background: m.color, border: '2px solid rgba(255,255,255,0.8)', boxShadow: `0 0 10px ${m.color}` }} />
-                                      <div style={{ position: 'absolute', top: '18px', left: '50%', transform: 'translateX(-50%)', fontSize: '9px', fontWeight: 700, color: m.color, whiteSpace: 'nowrap', letterSpacing: '0.5px' }}>
-                                        {fmtCr(m.val)}
-                                      </div>
-                                    </div>
-                                  ))}
-                                </div>
-                                <div style={{ display: 'flex', justifyContent: 'space-between', fontSize: '9px', color: T.textMuted, marginTop: '8px' }}>
-                                  <span style={{ color: T.red }}>◀ Worst case</span>
-                                  <span style={{ color: T.textMuted }}>NPV spread: {fmtCr(max - min)}</span>
-                                  <span style={{ color: T.green }}>Best case ▶</span>
-                                </div>
-                              </>
-                            );
-                          })()}
-                        </Card>
-                      </div>
-                    )}
 
                     {/* ── RISK & IRR ─────────────────────────────────────────── */}
                     {tab === 'risk' && (
@@ -959,58 +947,7 @@ export default function App() {
                             </div>
                           </Card>
 
-                          {/* Spider / Radar */}
-                          <Card style={{ padding: '28px' }}>
-                            <div style={{ fontSize: '16px', fontWeight: 700, color: T.text, marginBottom: '6px' }}>Spider Chart</div>
-                            <p style={{ fontSize: '12px', color: T.textSoft, marginBottom: '16px', lineHeight: 1.7 }}>
-                              Normalized sensitivity envelope (0–100). <span style={{ color: T.green }}>Green</span> = upside (+20%), <span style={{ color: T.red }}>Red</span> = downside (−20%).
-                            </p>
-                            <ResponsiveContainer width="100%" height={300}>
-                              <RadarChart data={chrt.spider_data} margin={{ top: 10, right: 30, bottom: 10, left: 30 }}>
-                                <PolarGrid stroke={T.border} />
-                                <PolarAngleAxis
-                                  dataKey="variable"
-                                  tick={{ fill: T.textSoft, fontSize: 10, fontFamily: T.mono, fontWeight: 700 }}
-                                />
-                                <PolarRadiusAxis
-                                  angle={90} domain={[0, 100]}
-                                  tick={{ fill: T.textMuted, fontSize: 9 }}
-                                  tickCount={4}
-                                  stroke="transparent"
-                                />
-                                <Radar name="Upside (+20%)"
-                                  dataKey="upside"
-                                  stroke={T.green} strokeWidth={2}
-                                  fill={T.green} fillOpacity={0.12}
-                                />
-                                <Radar name="Downside (−20%)"
-                                  dataKey="downside"
-                                  stroke={T.red} strokeWidth={2}
-                                  fill={T.red} fillOpacity={0.12}
-                                />
-                                <Legend
-                                  wrapperStyle={{ fontSize: '11px', paddingTop: '12px', color: T.textSoft }}
-                                  iconType="circle" iconSize={7}
-                                />
-                                <Tooltip
-                                  content={({ active, payload, label }) => {
-                                    if (!active || !payload?.length) return null;
-                                    return (
-                                      <div style={{ background: 'rgba(7,7,10,0.97)', border: `1px solid ${T.border}`, borderRadius: '10px', padding: '10px 14px', minWidth: '160px' }}>
-                                        <div style={{ fontSize: '10px', fontWeight: 700, color: T.textMuted, marginBottom: '8px', letterSpacing: '1px' }}>{label}</div>
-                                        {payload.map((e, i) => (
-                                          <div key={i} style={{ display: 'flex', justifyContent: 'space-between', gap: '12px', fontSize: '12px', marginBottom: '3px' }}>
-                                            <span style={{ color: e.color }}>{e.name}</span>
-                                            <span style={{ fontFamily: T.mono, fontWeight: 700, color: T.text }}>{e.value.toFixed(1)}</span>
-                                          </div>
-                                        ))}
-                                      </div>
-                                    );
-                                  }}
-                                />
-                              </RadarChart>
-                            </ResponsiveContainer>
-                          </Card>
+
                         </div>
 
                         <SectionLabel num="7">Internal Rate of Return vs Discount Rate</SectionLabel>
@@ -1212,134 +1149,211 @@ export default function App() {
                       </div>
                     )}
 
-                    {/* ── TAB 8: POPULATION VARIABILITY ─────────────────────── */}
+                    {/* ── VARIABILITY TAB ──────────────────────────────── */}
                     {tab === 'popvar' && (() => {
                       const vari = result.variability;
-                      if (!vari) return <div style={{ color: T.textMuted, padding: '40px', textAlign: 'center' }}>No variability data available.</div>;
-                      const SCEN_COLORS = ['#ef4444', '#f97316', '#a78bfa', '#22c55e', '#10b981'];
+                      if (!vari) return <div style={{ color: T.textMuted, padding: '40px', textAlign: 'center' }}>No variability data.</div>;
+                      const combined = vari.combined;
+                      const activeFuelGroup = combined?.fuel_groups?.find(g => g.fuel_id === fuelTab) ?? combined?.fuel_groups?.[0];
+                      const maxNpvAbs = combined ? Math.max(...combined.fuel_groups.flatMap(g => g.pop_rows.map(r => Math.abs(r.delta_npv))), 1) : 1;
                       return (
                         <div style={{ display: 'flex', flexDirection: 'column', gap: '32px' }}>
 
-                          {/* Header + Tier badge */}
+                          {/* Header */}
                           <div style={{ display: 'flex', alignItems: 'flex-start', justifyContent: 'space-between', flexWrap: 'wrap', gap: '12px' }}>
                             <div>
-                              <SectionLabel num="8">Population Variability Scenarios</SectionLabel>
-                              <p style={{ fontSize: '13px', color: T.textSoft, maxWidth: '700px', lineHeight: 1.7 }}>
-                                Using <strong style={{ color: T.text }}>{vari.tier}</strong> growth-rate schedule.
-                                2011 census population <strong style={{ color: T.violet }}>{vari.pop_2011.toLocaleString()}</strong> is
-                                projected to 2026 under 5 distinct rate trajectories (Min, Mean−σ, Mean, Mean+σ, Max).
-                                Each projected 2026 population drives a separate 30-year NPV computation.
+                              <SectionLabel num="V">Combined Variability — 15 Scenarios</SectionLabel>
+                              <p style={{ fontSize: '13px', color: T.textSoft, maxWidth: '740px', lineHeight: 1.8 }}>
+                                <strong style={{ color: T.text }}>{vari.tier}</strong> &middot; 2011 Census population{' '}
+                                <strong style={{ color: T.violet }}>{vari.pop_2011.toLocaleString()}</strong> &rarr; 2026 via mean rate, then 5 population paths.
+                                Combined with 3 fuel scenarios &rarr; <strong style={{ color: T.amber }}>15 joint outcomes</strong>.
+
                               </p>
                             </div>
                             <Tag color={T.cyan}>{vari.tier}</Tag>
                           </div>
 
-                          {/* Population projection chart */}
-                          <ChartShell
-                            title="Population Projection 2011 → 2050 (5 Scenarios)"
-                            sub="Fan chart showing how city population evolves under each growth-rate path. All five converge from a single 2011 anchor."
-                          >
-                            <ResponsiveContainer width="100%" height={320}>
-                              <AreaChart
-                                data={vari.pop_projection_table.map(r => ({
-                                  year: r.year,
-                                  min: r.min / 1e6,
-                                  mean_minus: r.mean_minus_std / 1e6,
-                                  mean: r.mean / 1e6,
-                                  mean_plus: r.mean_plus_std / 1e6,
-                                  max: r.max / 1e6,
-                                }))}
-                                margin={{ top: 8, right: 12, left: -8, bottom: 0 }}
-                              >
-                                <defs>
-                                  <linearGradient id="gMax" x1="0" y1="0" x2="0" y2="1">
-                                    <stop offset="0%" stopColor="#10b981" stopOpacity={0.3} />
-                                    <stop offset="100%" stopColor="#10b981" stopOpacity={0} />
-                                  </linearGradient>
-                                  <linearGradient id="gMin" x1="0" y1="0" x2="0" y2="1">
-                                    <stop offset="0%" stopColor="#ef4444" stopOpacity={0.15} />
-                                    <stop offset="100%" stopColor="#ef4444" stopOpacity={0} />
-                                  </linearGradient>
-                                </defs>
-                                <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.03)" vertical={false} />
-                                <XAxis dataKey="year" {...axX} />
-                                <YAxis {...axY(v => `${v.toFixed(1)}M`)} />
-                                <Tooltip content={<CustomTooltip />} />
-                                <Legend wrapperStyle={{ fontSize: '11px', paddingTop: '16px', color: T.textSoft }} iconType="line" iconSize={12} />
-                                <Area type="monotone" dataKey="max" name="Extreme Upside" stroke="#10b981" strokeWidth={1.5} fill="url(#gMax)" dot={false} strokeDasharray="4 2" />
-                                <Area type="monotone" dataKey="mean_plus" name="Upside Risk" stroke="#22c55e" strokeWidth={1.5} fill="none" dot={false} />
-                                <Area type="monotone" dataKey="mean" name="Expected Outcome" stroke="#a78bfa" strokeWidth={2.5} fill="none" dot={false} />
-                                <Area type="monotone" dataKey="mean_minus" name="Downside Risk" stroke="#f97316" strokeWidth={1.5} fill="none" dot={false} />
-                                <Area type="monotone" dataKey="min" name="Extreme Downside" stroke="#ef4444" strokeWidth={1.5} fill="url(#gMin)" dot={false} strokeDasharray="4 2" />
-                                <ReferenceLine x={2026} stroke="rgba(255,255,255,0.4)" strokeDasharray="4 2"
-                                  label={{ value: '2026 (Base)', position: 'top', fill: T.textMuted, fontSize: 10 }} />
-                              </AreaChart>
-                            </ResponsiveContainer>
-                          </ChartShell>
+                          {/* Charts Grid */}
+                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(400px, 1fr))', gap: '20px' }}>
+                            {/* Population fan chart */}
+                            <ChartShell title="Population Projection 2011 → 2056" sub="All 5 paths converge on the mean up to 2026, then fan out.">
+                              <ResponsiveContainer width="100%" height={260}>
+                                <AreaChart data={vari.pop_projection_table.map(r => ({
+                                  year: r.year, min: r.min / 1e6, mean_minus: r.mean_minus_std / 1e6,
+                                  mean: r.mean / 1e6, mean_plus: r.mean_plus_std / 1e6, max: r.max / 1e6,
+                                }))} margin={{ top: 8, right: 12, left: -8, bottom: 0 }}>
+                                  <defs>
+                                    <linearGradient id="gVMax" x1="0" y1="0" x2="0" y2="1">
+                                      <stop offset="0%" stopColor="#10b981" stopOpacity={0.25} /><stop offset="100%" stopColor="#10b981" stopOpacity={0} />
+                                    </linearGradient>
+                                    <linearGradient id="gVMin" x1="0" y1="0" x2="0" y2="1">
+                                      <stop offset="0%" stopColor="#ef4444" stopOpacity={0.12} /><stop offset="100%" stopColor="#ef4444" stopOpacity={0} />
+                                    </linearGradient>
+                                  </defs>
+                                  <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.03)" vertical={false} />
+                                  <XAxis dataKey="year" {...axX} />
+                                  <YAxis {...axY(v => `${v.toFixed(1)}M`)} />
+                                  <Tooltip content={<CustomTooltip />} />
+                                  <Legend wrapperStyle={{ fontSize: '11px', paddingTop: '12px', color: T.textSoft }} iconType="line" iconSize={10} />
+                                  <Area type="monotone" dataKey="max" name="Extreme Upside" stroke="#10b981" strokeWidth={1.5} fill="url(#gVMax)" dot={false} strokeDasharray="5 3" />
+                                  <Area type="monotone" dataKey="mean_plus" name="Upside Risk" stroke="#22c55e" strokeWidth={1.5} fill="none" dot={false} />
+                                  <Area type="monotone" dataKey="mean" name="Expected" stroke="#a78bfa" strokeWidth={2.5} fill="none" dot={false} />
+                                  <Area type="monotone" dataKey="mean_minus" name="Downside Risk" stroke="#f97316" strokeWidth={1.5} fill="none" dot={false} />
+                                  <Area type="monotone" dataKey="min" name="Extreme Downside" stroke="#ef4444" strokeWidth={1.5} fill="url(#gVMin)" dot={false} strokeDasharray="5 3" />
+                                  <ReferenceLine x={2026} stroke="rgba(255,255,255,0.35)" strokeDasharray="4 2"
+                                    label={{ value: 'mean only  |  scenarios', position: 'top', fill: T.textMuted, fontSize: 9 }} />
+                                </AreaChart>
+                              </ResponsiveContainer>
+                            </ChartShell>
 
-                          {/* 5 NPV Scenario cards */}
-                          <SectionLabel num="8B">Per-Scenario NPV Decision Outcomes</SectionLabel>
-                          <div style={{ display: 'grid', gridTemplateColumns: 'repeat(auto-fit, minmax(220px, 1fr))', gap: '16px' }}>
-                            {vari.scenarios.map((sc, i) => (
-                              <Card key={i} style={{
-                                padding: '24px',
-                                borderColor: `${sc.color}40`,
-                                boxShadow: `0 0 28px -8px ${sc.color}20`,
-                              }}>
-                                <div style={{ display: 'flex', alignItems: 'center', gap: '8px', marginBottom: '20px' }}>
-                                  <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: sc.color, boxShadow: `0 0 8px ${sc.color}` }} />
-                                  <div style={{ fontSize: '10px', fontWeight: 800, color: sc.color === '#a78bfa' ? '#fff' : T.textSoft, letterSpacing: '1.5px', textTransform: 'uppercase' }}>
-                                    {sc.label}
-                                  </div>
-                                </div>
-
-                                {/* Population line */}
-                                <div style={{ marginBottom: '16px', padding: '10px 12px', background: 'rgba(255,255,255,0.03)', borderRadius: '8px', border: `1px solid ${T.border}` }}>
-                                  <div style={{ fontSize: '9px', fontWeight: 700, color: T.textMuted, letterSpacing: '1px', marginBottom: '4px' }}>2026 PROJECTED POP.</div>
-                                  <div style={{ fontFamily: T.mono, fontSize: '14px', fontWeight: 700, color: T.textSoft }}>
-                                    {(sc.pop_2026 / 1e6).toFixed(3)} M
-                                  </div>
-                                </div>
-
-                                {/* NPV */}
-                                <div style={{ fontFamily: T.mono, fontSize: '28px', fontWeight: 900, color: sc.delta_npv > 0 ? T.green : T.red, letterSpacing: '-0.5px', marginBottom: '8px' }}>
-                                  {fmtCr(sc.delta_npv)}
-                                </div>
-                                <div style={{ fontSize: '10px', color: T.textMuted, marginBottom: '12px' }}>Δ NPV (Grade Sep − Signal)</div>
-
-                                {/* IRR & payback mini row */}
-                                <div style={{ display: 'flex', gap: '8px', flexWrap: 'wrap' }}>
-                                  {sc.irr != null && (
-                                    <div style={{ padding: '4px 8px', borderRadius: '5px', background: `${sc.color}15`, border: `1px solid ${sc.color}30`, fontSize: '11px', fontWeight: 700, color: sc.color, fontFamily: T.mono }}>
-                                      IRR {sc.irr.toFixed(1)}%
-                                    </div>
-                                  )}
-                                  {sc.payback != null && (
-                                    <div style={{ padding: '4px 8px', borderRadius: '5px', background: 'rgba(251,191,36,0.1)', border: '1px solid rgba(251,191,36,0.3)', fontSize: '11px', fontWeight: 700, color: T.amber, fontFamily: T.mono }}>
-                                      Yr {sc.payback}
-                                    </div>
-                                  )}
-                                </div>
-                              </Card>
-                            ))}
+                            {/* Fuel Projection Chart */}
+                            {combined?.fuel_projection_table && (
+                              <ChartShell title="Fuel Price Projection 2025 → 2056" sub="Price per litre under Green (3%), Base (5.1%), and High (6%) growth.">
+                                <ResponsiveContainer width="100%" height={260}>
+                                  <LineChart data={combined.fuel_projection_table} margin={{ top: 8, right: 12, left: -8, bottom: 0 }}>
+                                    <CartesianGrid strokeDasharray="3 3" stroke="rgba(255,255,255,0.03)" vertical={false} />
+                                    <XAxis dataKey="year" {...axX} />
+                                    <YAxis {...axY(v => `₹${v.toFixed(0)}`)} />
+                                    <Tooltip content={<CustomTooltip />} formatter={(val) => `₹${val.toFixed(2)}`} />
+                                    <Legend wrapperStyle={{ fontSize: '11px', paddingTop: '12px', color: T.textSoft }} iconType="circle" iconSize={8} />
+                                    <Line type="monotone" dataKey="high" name="High Growth (6%)" stroke="#f43f5e" strokeWidth={2} dot={false} />
+                                    <Line type="monotone" dataKey="base" name="Base Case (5.1%)" stroke="#a78bfa" strokeWidth={2.5} dot={false} />
+                                    <Line type="monotone" dataKey="green" name="Green Scenario (3%)" stroke="#10b981" strokeWidth={2} dot={false} />
+                                  </LineChart>
+                                </ResponsiveContainer>
+                              </ChartShell>
+                            )}
                           </div>
 
-                          {/* NPV comparison bar */}
-                          <Card style={{ padding: '28px' }}>
-                            <div style={{ fontSize: '11px', fontWeight: 700, color: T.textMuted, letterSpacing: '1px', marginBottom: '20px' }}>NPV RANGE ACROSS ALL 5 POPULATION SCENARIOS</div>
-                            {vari.scenarios.map((sc, i) => {
-                              const maxAbs = Math.max(...vari.scenarios.map(s => Math.abs(s.delta_npv)), 1);
-                              return (
-                                <div key={i} style={{ marginBottom: i < vari.scenarios.length - 1 ? '14px' : 0 }}>
-                                  <div style={{ display: 'flex', justifyContent: 'space-between', marginBottom: '6px' }}>
-                                    <span style={{ fontSize: '11px', color: T.textSoft, fontWeight: 600 }}>{sc.label}</span>
-                                    <span style={{ fontFamily: T.mono, fontSize: '11px', fontWeight: 700, color: sc.color }}>{fmtCr(sc.delta_npv)}</span>
-                                  </div>
-                                  <ProgressBar pct={(Math.abs(sc.delta_npv) / maxAbs) * 100} color={sc.color} h={7} />
+                          {/* Overall expected NPV hero card */}
+                          {combined && (
+                            <Card style={{ padding: '32px', display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center', gap: '28px', textAlign: 'center', borderColor: combined.overall_expected_npv > 0 ? `${T.green}50` : `${T.red}50` }}>
+                              <div>
+                                <div style={{ fontSize: '12px', fontWeight: 800, color: T.textSoft, letterSpacing: '1.5px', marginBottom: '8px' }}>OVERALL WEIGHTED AVERAGE NPV (15 SCENARIOS)</div>
+                                <div style={{ fontFamily: T.mono, fontSize: '48px', fontWeight: 900, color: combined.overall_expected_npv > 0 ? T.green : T.red, letterSpacing: '-1.5px' }}>
+                                  {fmtCr(combined.overall_expected_npv)}
                                 </div>
-                              );
-                            })}
-                          </Card>
+                                <div style={{ fontSize: '13px', color: T.textMuted, marginTop: '8px' }}>
+                                  Average Net Present Value across all 15 scenarios, weighted by their probabilities.
+                                </div>
+                              </div>
+                              <div style={{ display: 'flex', gap: '16px', flexWrap: 'wrap', justifyContent: 'center' }}>
+                                {combined.fuel_groups.map(g => (
+                                  <div key={g.fuel_id} style={{ padding: '16px 20px', borderRadius: '12px', background: `${g.fuel_color}08`, border: `1px solid ${g.fuel_color}30`, minWidth: '140px', display: 'flex', flexDirection: 'column', alignItems: 'center' }}>
+                                    <div style={{ fontSize: '10px', fontWeight: 700, color: T.textMuted, letterSpacing: '1px', marginBottom: '8px' }}>{g.fuel_label.toUpperCase()}</div>
+                                    <div style={{ fontFamily: T.mono, fontSize: '18px', fontWeight: 800, color: g.fuel_color }}>{fmtCr(g.expected_npv)}</div>
+                                    <div style={{ fontSize: '11px', color: T.textMuted, marginTop: '6px' }}>Probability = {(g.fuel_prob * 100).toFixed(0)}% &middot; +{g.fuel_rate_pct}%/yr</div>
+                                  </div>
+                                ))}
+                              </div>
+                            </Card>
+                          )}
+
+                          {/* Fuel scenario sub-tabs + 5-row NPV matrix */}
+                          {combined && (
+                            <div>
+                              <SectionLabel num="15">NPV Matrix by Fuel Scenario</SectionLabel>
+
+                              {/* Fuel tab switcher */}
+                              <div style={{ display: 'flex', gap: '0', marginBottom: '20px', background: 'rgba(0,0,0,0.3)', borderRadius: '12px', padding: '4px', border: `1px solid ${T.border}` }}>
+                                {combined.fuel_groups.map(g => {
+                                  const active = fuelTab === g.fuel_id;
+                                  return (
+                                    <button key={g.fuel_id} onClick={() => setFuelTab(g.fuel_id)} style={{
+                                      flex: 1, padding: '10px 8px', border: 'none', borderRadius: '9px',
+                                      background: active ? g.fuel_color : 'transparent',
+                                      color: active ? '#000' : T.textSoft,
+                                      fontWeight: 700, fontSize: '13px', cursor: 'pointer',
+                                      transition: 'all 0.2s',
+                                      display: 'flex', flexDirection: 'column', alignItems: 'center', justifyContent: 'center'
+                                    }}>
+                                      {g.fuel_label}
+                                      <div style={{ fontSize: '10px', fontWeight: 500, opacity: 0.8, marginTop: '2px' }}>
+                                        +{g.fuel_rate_pct}%/yr || Probability={(g.fuel_prob * 100).toFixed(0)}%
+                                      </div>
+                                    </button>
+                                  );
+                                })}
+                              </div>
+
+                              {/* 5-row table for active fuel */}
+                              {activeFuelGroup && (
+                                <div style={{ display: 'flex', flexDirection: 'column', gap: '4px' }}>
+                                  <div style={{ fontSize: '11px', color: T.textMuted, textAlign: 'right', fontStyle: 'italic', paddingRight: '4px' }}>
+                                    Scroll ↔ to view full table
+                                  </div>
+                                  <div style={{ position: 'relative' }}>
+                                    <button onClick={() => scrollBar(tableScrollRef, -1)} style={{
+                                      position: 'absolute', left: 0, top: 0, bottom: '8px', zIndex: 2, width: '32px',
+                                      background: `linear-gradient(to right, ${T.bg}, transparent)`,
+                                      border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center',
+                                      justifyContent: 'center', color: T.textSoft, fontSize: '18px',
+                                      transition: 'color 0.15s',
+                                    }} onMouseEnter={e => e.currentTarget.style.color = T.text}
+                                      onMouseLeave={e => e.currentTarget.style.color = T.textSoft}>‹</button>
+
+                                    <div ref={tableScrollRef} style={{ overflowX: 'auto', paddingBottom: '8px', scrollbarWidth: 'none', paddingLeft: '32px', paddingRight: '32px' }}>
+                                      <div style={{ minWidth: '780px', display: 'flex', flexDirection: 'column', gap: '10px' }}>
+                                        <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 80px 80px 100px 120px 80px 80px', gap: '8px', padding: '10px 16px', background: 'rgba(0,0,0,0.2)', borderRadius: '8px' }}>
+                                          {['Population Scenario', 'Population Probability', 'Fuel Probability', 'Joint Likelihood', 'Net Value (NPV)', 'IRR', 'Payback'].map(h => (
+                                            <div key={h} style={{ fontSize: '11px', fontWeight: 700, color: T.textSoft, letterSpacing: '0.5px', textAlign: h === 'Population Scenario' ? 'left' : 'right' }}>{h}</div>
+                                          ))}
+                                        </div>
+
+                                        {activeFuelGroup.pop_rows.map((row, i) => (
+                                          <Card key={i} style={{ padding: '12px 16px', borderColor: `${row.pop_color}30` }}>
+                                            <div style={{ display: 'grid', gridTemplateColumns: '1.2fr 80px 80px 100px 120px 80px 80px', gap: '8px', alignItems: 'center' }}>
+                                              <div style={{ display: 'flex', alignItems: 'center', gap: '10px' }}>
+                                                <div style={{ width: '8px', height: '8px', borderRadius: '50%', background: row.pop_color, flexShrink: 0, boxShadow: `0 0 6px ${row.pop_color}` }} />
+                                                <div style={{ fontSize: '13px', fontWeight: 700, color: T.text }}>{row.pop_label}</div>
+                                              </div>
+                                              <div style={{ textAlign: 'right', fontFamily: T.mono, fontSize: '12px', color: T.textSoft }}>{row.pop_prob.toFixed(2)}</div>
+                                              <div style={{ textAlign: 'right', fontFamily: T.mono, fontSize: '12px', color: T.textSoft }}>{row.fuel_prob.toFixed(2)}</div>
+                                              <div style={{ textAlign: 'right' }}>
+                                                <span style={{ padding: '2px 7px', borderRadius: '5px', background: `${row.pop_color}18`, border: `1px solid ${row.pop_color}35`, fontFamily: T.mono, fontSize: '12px', fontWeight: 700, color: row.pop_color }}>
+                                                  {(row.joint_prob * 100).toFixed(1)}%
+                                                </span>
+                                              </div>
+                                              <div style={{ textAlign: 'right', fontFamily: T.mono, fontSize: '14px', fontWeight: 800, color: row.delta_npv > 0 ? T.green : T.red }}>
+                                                {fmtCr(row.delta_npv)}
+                                              </div>
+                                              <div style={{ textAlign: 'right', fontFamily: T.mono, fontSize: '13px', color: row.irr != null && row.irr > 10 ? T.green : T.red }}>
+                                                {row.irr != null ? `${row.irr.toFixed(1)}%` : '—'}
+                                              </div>
+                                              <div style={{ textAlign: 'right', fontFamily: T.mono, fontSize: '13px', color: T.amber }}>
+                                                {row.payback != null ? `Yr ${row.payback}` : '—'}
+                                              </div>
+                                            </div>
+                                            <div style={{ marginTop: '10px' }}>
+                                              <ProgressBar pct={Math.abs(row.delta_npv) / maxNpvAbs * 100} color={row.delta_npv > 0 ? T.green : T.red} h={5} />
+                                            </div>
+                                          </Card>
+                                        ))}
+                                      </div>
+                                    </div>
+                                    <button onClick={() => scrollBar(tableScrollRef, 1)} style={{
+                                      position: 'absolute', right: 0, top: 0, bottom: '8px', zIndex: 2, width: '32px',
+                                      background: `linear-gradient(to left, ${T.bg}, transparent)`,
+                                      border: 'none', cursor: 'pointer', display: 'flex', alignItems: 'center',
+                                      justifyContent: 'center', color: T.textSoft, fontSize: '18px',
+                                      transition: 'color 0.15s',
+                                    }} onMouseEnter={e => e.currentTarget.style.color = T.text}
+                                      onMouseLeave={e => e.currentTarget.style.color = T.textSoft}>›</button>
+                                  </div>
+
+                                  {/* Expected NPV footer for this fuel */}
+                                  <div style={{ padding: '14px 20px', borderRadius: '10px', background: `${activeFuelGroup.fuel_color}10`, border: `1px solid ${activeFuelGroup.fuel_color}30`, display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                                    <div style={{ fontSize: '11px', fontWeight: 800, color: T.textSoft, letterSpacing: '1px' }}>
+                                      AVERAGE NET VALUE (If {activeFuelGroup.fuel_label} Occurs)
+                                    </div>
+                                    <div style={{ fontFamily: T.mono, fontSize: '20px', fontWeight: 900, color: activeFuelGroup.expected_npv > 0 ? T.green : T.red }}>
+                                      {fmtCr(activeFuelGroup.expected_npv)}
+                                    </div>
+                                  </div>
+                                </div>
+                              )}
+                            </div>
+                          )}
 
                         </div>
                       );
