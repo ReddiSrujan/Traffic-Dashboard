@@ -209,7 +209,7 @@ const TABS = [
   { id: 'risk', label: 'SENSITIVITY & IRR', icon: '4.' },
   { id: 'payback', label: 'PAYBACK', icon: '5.' },
   // { id: 'variability', label: 'VARIABILITY-GDP', icon: '7.' },  // hidden — uncomment to enable
-  { id: 'popvar', label: 'VARIABILITY', icon: '6.' },
+  { id: 'popvar', label: 'SCENARIOS', icon: '6.' },
 ];
 
 /* ─── GDP Variability Schedule (frontend mirror) ────────────────────────────── */
@@ -237,24 +237,31 @@ const GDP_CHART_DATA = (() => {
 
 /* ─── APP ───────────────────────────────────────────────────────────────────── */
 export default function App() {
-  const [numPhases, setNumPhases] = useState(4);
-  const [phaseData, setPhaseData] = useState(Array.from({ length: 4 }, () => ({ criticalVolume: 500, lanes: 2 })));
-  const [totalVol, setTotalVol] = useState(5000);
+  const [numPhases, setNumPhases] = useState(6);
+  const [phaseData, setPhaseData] = useState([
+    { criticalVolume: 536, lanes: 2 },
+    { criticalVolume: 541, lanes: 2 },
+    { criticalVolume: 311, lanes: 2 },
+    { criticalVolume: 99, lanes: 1 },
+    { criticalVolume: 297, lanes: 1 },
+    { criticalVolume: 279, lanes: 1 }
+  ]);
+  const [totalVol, setTotalVol] = useState(3133);
   const [occupancy, setOccupancy] = useState(1.8);
-  const [gdp, setGdp] = useState(200000);
+  const [gdp, setGdp] = useState(38572.8);
   // population is derived server-side from pop2011 via mean-scenario tier projection
-  const [pop2011, setPop2011] = useState(5000000);
-  const [fuelCost, setFuelCost] = useState(100);
+  const [pop2011, setPop2011] = useState(2822143);
+  const [fuelCost, setFuelCost] = useState(65);
   const [inflation, setInflation] = useState(6.0);
-  const [discount, setDiscount] = useState(10.0);
+  const [discount, setDiscount] = useState(6.0);
   // Traffic growth is now handled via the backend TRAFFIC_SCHED schedule, not a user input.
   const [idleFuel, setIdleFuel] = useState(0.7);
-  const [voc, setVoc] = useState(3.0);
+  const [voc, setVoc] = useState(5.0);
   const [carbon, setCarbon] = useState(1.5);
-  const [sigInstall, setSigInstall] = useState(500000);
-  const [sigMaint, setSigMaint] = useState(200000);
-  const [buildCost, setBuildCost] = useState(50.0);
-  const [gradeMaint, setGradeMaint] = useState(250000);
+  const [sigInstall, setSigInstall] = useState(1000000);
+  const [sigMaint, setSigMaint] = useState(155000);
+  const [buildCost, setBuildCost] = useState(161.51);
+  const [gradeMaint, setGradeMaint] = useState(0);
   const [isDark, setIsDark] = useState(false);
   const toggleTheme = () => {
     const next = isDark ? lightTheme : darkTheme;
